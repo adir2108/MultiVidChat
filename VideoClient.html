@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Chat</title>
+</head>
+<body>
+
+<video id="localVideo" autoplay muted playsinline style="width:45%; border:1px solid black;"></video>
+<video id="remoteVideo" autoplay playsinline style="width:45%; border:1px solid black;"></video>
+
+<script>
+let pc;
+let ws;
+let localStream;
+let isCaller = false;
+
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+
+const username = prompt("Enter your username:");
+const room = prompt("Enter room name:");
+
+// חיבור ל-WebSocket
+ws = new WebSocket("ws://192.168.4.96:8765");
+
+// אתחול מצלמה ו-PeerConnection
+async function initConnection() {
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    localVideo.srcObject = localStream;
+
+    pc = new RTCPeerConnection({
+        iceServers: [{urls: "stun:stun.l.google.com:19302"}]
+    });
+
+    // קבלת זרימת וידאו מרחוק
+    pc.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+
+    // שליחת ICE candidates לשרת
+    pc.onicecandidate = e => {
+        if(e.candidate){
+            ws.send(JSON.stringify({action:"ice", candidate:e.candidate}));
+        }
+    };
+
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+}
+
+// caller שולח offer
+async function makeCall() {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    ws.send(JSON.stringify({action:"offer", offer}));
+}
+
+// callee שולח answer
+async function answerCall(offer) {
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({action:"answer", answer}));
+}
+
+ws.onopen = () => {
+    ws.send(JSON.stringify({action:"set_user", username, room}));
+};
+
+ws.onmessage = async (event) => {
+    const data = JSON.parse(event.data);
+
+    if(data.action === "set_user_ack"){
+        await initConnection();
+        if(data.isCaller){
+            isCaller = true;
+            makeCall();
+        }
+    }
+
+    if(data.action === "offer"){
+        if(!pc) await initConnection();
+        await answerCall(data.offer);
+    }
+
+    if(data.action === "answer"){
+        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    }
+
+    if(data.action === "ice"){
+        try {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch(e) {
+            console.error("Failed to add ICE candidate", e);
+        }
+    }
+};
+</script>
+
+</body>
+</html>

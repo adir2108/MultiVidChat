@@ -1,0 +1,36 @@
+{
+    "users": {
+        "Adir": {
+            "password": "dbfaefbe21e6c2ca00563178e93bc7627895ea1b423d33a11389484b4e93c5fa"
+        },
+        "Martin": {
+            "password": "a00d6af1cfbd7249bf29e2311454234c039beebee2b5e7b6e581423640f71367"
+        },
+        "Idan": {
+            "password": "96a9f7d97ad96d54e8a86d0b4d6abb81c47f3334104c679519e29b9d5d3a6006"
+        },
+        "Sean": {
+            "password": "687cc8c0b5bc5243dc869328c6f856cdad8a776205f936d117c7b1037d43f6eb"
+        },
+        "3": {
+            "password": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+        },
+        "1": {
+            "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        }
+    },
+    "pms": [
+        {
+            "sender": "Martin",
+            "recipient": "Adir",
+            "message": "hello",
+            "timestamp": 1767951319.2856777
+        },
+        {
+            "sender": "Adir",
+            "recipient": "Martin",
+            "message": "how are you",
+            "timestamp": 1767951361.2540545
+        }
+    ]
+}
