@@ -5,8 +5,10 @@
 </head>
 <body>
 
-<video id="localVideo" autoplay muted playsinline style="width:45%; border:1px solid black;"></video>
-<video id="remoteVideo" autoplay playsinline style="width:45%; border:1px solid black;"></video>
+<div style="display:flex; justify-content:center; align-items:center; height:100vh; gap:10px;">
+    <video id="localVideo" autoplay muted playsinline style="width:45%; border:1px solid black; background:black;"></video>
+    <video id="remoteVideo" autoplay playsinline style="width:45%; border:1px solid black; background:black;"></video>
+</div>
 
 <script>
 let pc;
@@ -17,81 +19,90 @@ let isCaller = false;
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 
-const username = prompt("Enter your username:");
-const room = prompt("Enter room name:");
+const params = new URLSearchParams(window.location.search);
+const username = params.get("username");
+const room = params.get("room");
 
-// חיבור ל-WebSocket
-ws = new WebSocket("ws://192.168.4.96:8765");
+// Connect to WebSocket
+ws = new WebSocket(`ws://${window.location.hostname}:8765`);
 
-// אתחול מצלמה ו-PeerConnection
+// Initialize the peer connection and get local stream
 async function initConnection() {
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-    localVideo.srcObject = localStream;
+    try {
+        // Ask for camera and mic
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
 
-    pc = new RTCPeerConnection({
-        iceServers: [{urls: "stun:stun.l.google.com:19302"}]
-    });
+        pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        });
 
-    // קבלת זרימת וידאו מרחוק
-    pc.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+        // When remote track arrives
+        pc.ontrack = (event) => {
+            console.log("Remote stream received");
+            remoteVideo.srcObject = event.streams[0];
+        };
 
-    // שליחת ICE candidates לשרת
-    pc.onicecandidate = e => {
-        if(e.candidate){
-            ws.send(JSON.stringify({action:"ice", candidate:e.candidate}));
-        }
-    };
+        // Send ICE candidates to server
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({ action: "ice", candidate: event.candidate }));
+            }
+        };
 
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        // Add local tracks
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        console.log("Local stream added to PeerConnection");
+    } catch (err) {
+        console.error("Error accessing camera/mic:", err);
+        alert("Cannot access camera/microphone. Make sure you allowed it.");
+    }
 }
 
-// caller שולח offer
+// Caller creates an offer
 async function makeCall() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    ws.send(JSON.stringify({action:"offer", offer}));
+    ws.send(JSON.stringify({ action: "offer", offer }));
 }
 
-// callee שולח answer
+// Callee answers
 async function answerCall(offer) {
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    ws.send(JSON.stringify({action:"answer", answer}));
+    ws.send(JSON.stringify({ action: "answer", answer }));
 }
 
-ws.onopen = () => {
-    ws.send(JSON.stringify({action:"set_user", username, room}));
-};
+// WebSocket logic
+ws.onopen = () => ws.send(JSON.stringify({ action: "set_user", username, room }));
 
 ws.onmessage = async (event) => {
     const data = JSON.parse(event.data);
 
-    if(data.action === "set_user_ack"){
-        await initConnection();
-        if(data.isCaller){
+    // Always initialize connection first if not already
+    if (!pc) await initConnection();
+
+    if (data.action === "set_user_ack") {
+        if (data.isCaller) {
             isCaller = true;
             makeCall();
         }
-    }
-
-    if(data.action === "offer"){
-        if(!pc) await initConnection();
+    } else if (data.action === "offer") {
         await answerCall(data.offer);
-    }
-
-    if(data.action === "answer"){
+    } else if (data.action === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-    }
-
-    if(data.action === "ice"){
+    } else if (data.action === "ice") {
         try {
             await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch(e) {
-            console.error("Failed to add ICE candidate", e);
+        } catch (e) {
+            console.error("ICE candidate error", e);
         }
     }
 };
+
+
+
 </script>
 
 </body>

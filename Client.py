@@ -3,10 +3,11 @@ import threading
 import sys
 import os
 import webbrowser
-import json
 
-HOST = '192.168.4.96'
+HOST = '192.168.4.70'
 PORT = 8080
+CURRENT_USERNAME = None
+CURRENT_ROOM = "lobby"
 
 def clear_console():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -18,16 +19,17 @@ def prompt_input(prompt_char="> "):
 # מיקום HTML עם הוידאו
 VIDEO_HTML = os.path.abspath("VideoClient.html")
 
-def open_video_chat():
+def open_video_chat(username, room, host_ip):
     try:
-        chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-        webbrowser.get('chrome').open(f"file:///{VIDEO_HTML}")
+        url = f"http://{host_ip}:8000/VideoClient.html?username={username}&room={room}"
+        webbrowser.open(url)
     except Exception as e:
         print(f"Failed to open browser: {e}")
 
 
 def receive(client):
+    global CURRENT_USERNAME
+    global CURRENT_ROOM
     while True:
         try:
             full_message = client.recv(1024).decode('utf-8')
@@ -46,14 +48,22 @@ def receive(client):
             elif msg_type == 'S':
                 print(f"\n{message}")
             elif msg_type == 'V':
-                if message == "OPEN_VIDEO":
-                    open_video_chat()
+                if message.startswith("OPEN_VIDEO"):
+                    parts = message.split('|')
+                    bridge_ip = parts[1]
+                    open_video_chat(CURRENT_USERNAME, CURRENT_ROOM, bridge_ip)
             elif msg_type == 'E':
                 print(f"\n{message}\n")
             elif msg_type == 'M':
                 print(f"\n{message}")
             elif msg_type == 'I':
                 print(f"{message}")
+                if "You joined:" in message:
+                    lines = message.split('\n')
+                    for line in lines:
+                        if line.startswith("You joined:"):
+                            CURRENT_ROOM = line[len("You joined:"):].strip()
+                            break
             elif msg_type == 'P':
                 print(f"** {message} **")
             elif msg_type == 'O':
@@ -74,7 +84,12 @@ def write(client):
         try:
             message = input()
             if message:
+                global CURRENT_USERNAME
+                if CURRENT_USERNAME is None:
+                    # first username typed during login
+                    CURRENT_USERNAME = message
                 client.send(message.encode('utf-8'))
+
             prompt_input()
         except EOFError:
             print("\nClosing connection...")

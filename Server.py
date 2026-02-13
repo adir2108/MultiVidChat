@@ -53,14 +53,17 @@ def relay_webrtc_signal(sender_client, payload):
 
     sender = ONLINE_USERS.get(sender_client, "Unknown")
 
+    # Construct the signaling message
     data = json.dumps({
         "from": sender,
         "payload": payload
     })
 
+    # Only send the signaling data to the clients in the same room (but not the sender)
     for client in ROOMS.get(room, []):
-        if client != sender_client:
-            send_to_client(client, "V|" + data)
+        if client != sender_client:  # Don't send to the sender
+            send_to_client(client, "V|" + data)  # Forward signaling message
+
 
 def register_user(username, password):
     if username in CHAT_DATA['users']:
@@ -276,6 +279,7 @@ def process_command(client, command):
 
 
 
+
     elif cmd == '/accept':
 
         current_room = CLIENT_ROOM.get(client)
@@ -285,12 +289,15 @@ def process_command(client, command):
 
             return
 
-        # שליחה לכל המשתמשים בחדר כדי לפתוח את הוידאו
+        bridge_ip = "192.168.4.70"  # host running bridge + HTTP server
+
+        # Send to all peers to open the video page via HTTP
 
         for peer in ROOMS[current_room]:
-            send_to_client(peer, "V|OPEN_VIDEO")
+            send_to_client(peer, f"V|OPEN_VIDEO|{bridge_ip}")
 
         send_to_client(client, "S|Call accepted. Opening video chat...")
+
 
 
 
