@@ -259,6 +259,8 @@ def process_command(client, command):
 
 
 
+
+
     elif cmd == '/call':
 
         username = ONLINE_USERS.get(client, 'Unknown')
@@ -270,12 +272,15 @@ def process_command(client, command):
 
             return
 
+        # only notify others
+
         for peer in ROOMS[current_room]:
 
             if peer != client:
-                send_to_client(peer, f"M|{username} wants to start a video call! Type /accept")
+                send_to_client(peer, f"M| {username} wants to start a video call. Type /accept")
 
-        send_to_client(client, "I|Video call request sent to the users in the room.")
+        send_to_client(client, "S|Call request sent.")
+
 
 
 
@@ -285,18 +290,16 @@ def process_command(client, command):
         current_room = CLIENT_ROOM.get(client)
 
         if not current_room:
-            send_to_client(client, "E|You are not in a room! Use /join first.")
+            send_to_client(client, "E|Join a room first")
 
             return
 
-        bridge_ip = "192.168.4.70"  # host running bridge + HTTP server
-
-        # Send to all peers to open the video page via HTTP
+        ngrok_url = "https://jacquelin-subfestive-overpopularly.ngrok-free.dev"
 
         for peer in ROOMS[current_room]:
-            send_to_client(peer, f"V|OPEN_VIDEO|{bridge_ip}")
+            send_to_client(peer, f"V|OPEN_VIDEO|{ngrok_url}")
 
-        send_to_client(client, "S|Call accepted. Opening video chat...")
+        send_to_client(client, "S|Video call started")
 
 
 

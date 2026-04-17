@@ -4,10 +4,11 @@ import sys
 import os
 import webbrowser
 
-HOST = '192.168.4.70'
+HOST = '192.168.2.31'
 PORT = 8080
 CURRENT_USERNAME = None
 CURRENT_ROOM = "lobby"
+ngrok_url = "https://jacquelin-subfestive-overpopularly.ngrok-free.dev"
 
 def clear_console():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -19,9 +20,9 @@ def prompt_input(prompt_char="> "):
 # מיקום HTML עם הוידאו
 VIDEO_HTML = os.path.abspath("VideoClient.html")
 
-def open_video_chat(username, room, host_ip):
+def open_video_chat(username, room, ngrok_url):
     try:
-        url = f"http://{host_ip}:8000/VideoClient.html?username={username}&room={room}"
+        url = f"{ngrok_url}/VideoClient.html?username={username}&room={room}"
         webbrowser.open(url)
     except Exception as e:
         print(f"Failed to open browser: {e}")
@@ -50,8 +51,8 @@ def receive(client):
             elif msg_type == 'V':
                 if message.startswith("OPEN_VIDEO"):
                     parts = message.split('|')
-                    bridge_ip = parts[1]
-                    open_video_chat(CURRENT_USERNAME, CURRENT_ROOM, bridge_ip)
+                    ngrok_url = parts[1]
+                    open_video_chat(CURRENT_USERNAME, CURRENT_ROOM, ngrok_url)
             elif msg_type == 'E':
                 print(f"\n{message}\n")
             elif msg_type == 'M':

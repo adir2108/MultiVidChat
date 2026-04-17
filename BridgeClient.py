@@ -1,56 +1,58 @@
 import asyncio
-import websockets
 import json
-import threading
-from http.server import SimpleHTTPRequestHandler
-from socketserver import ThreadingTCPServer
+from aiohttp import web
 
-
+PORT = 8000
 
 ROOM_PEERS = {}
-ws_room_map = {}  # NEW: track each ws -> room
+ws_room_map = {}
 
-async def handler(ws):
+# ---------------- HTML ROUTE ----------------
+async def index(request):
+    return web.FileResponse("VideoClient.html")
+
+# ---------------- WEBSOCKET ----------------
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
     room = None
-    username = None
 
     async for msg in ws:
-        data = json.loads(msg)
+        data = json.loads(msg.data)
         action = data.get("action")
 
         if action == "set_user":
-            username = data["username"]
             room = data["room"]
+            ws_room_map[ws] = room
 
-            ws_room_map[ws] = room   # <-- store room for this websocket
-
-            if room not in ROOM_PEERS:
-                ROOM_PEERS[room] = []
-            ROOM_PEERS[room].append(ws)
+            ROOM_PEERS.setdefault(room, []).append(ws)
 
             is_caller = len(ROOM_PEERS[room]) == 1
-            await ws.send(json.dumps({"action": "set_user_ack", "isCaller": is_caller}))
+
+            await ws.send_json({
+                "action": "set_user_ack",
+                "isCaller": is_caller
+            })
 
         elif action in ["offer", "answer", "ice"]:
-            room_of_ws = ws_room_map.get(ws)
-            if room_of_ws is None:
+            room = ws_room_map.get(ws)
+            if not room:
                 continue
-            for peer in ROOM_PEERS.get(room_of_ws, []):
+
+            for peer in ROOM_PEERS.get(room, []):
                 if peer != ws:
-                    await peer.send(json.dumps(data))
+                    await peer.send_json(data)
 
-def start_http():
-    handler = SimpleHTTPRequestHandler
-    httpd = ThreadingTCPServer(("0.0.0.0", 8000), handler)
-    print("HTTP server running on port 8000")
-    httpd.serve_forever()
+    return ws
 
+# ---------------- APP ----------------
+app = web.Application()
+app.add_routes([
+    web.get("/", index),
+    web.get("/VideoClient.html", index),
+    web.get("/ws", websocket_handler)
+])
 
-async def main():
-    threading.Thread(target=start_http, daemon=True).start()
-
-    async with websockets.serve(handler, "0.0.0.0", 8765):
-        print("WebSocket server running on port 8765")
-        await asyncio.Future()  # run forever
-
-asyncio.run(main())
+if __name__ == "__main__":
+    web.run_app(app, host="0.0.0.0", port=PORT)
